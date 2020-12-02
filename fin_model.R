@@ -154,36 +154,75 @@ summary(for_model)
 summary(back_model)
 summary(both_model)
 
-# forward and both produce the same models. Pretty high adj R^2 and significant t-vals
+# forward and both produce the same models. Relatively high adj R^2 and significant t-vals
 
-plot(back_model$fitted.values,back_model$residuals, main="Plot of Residuals against Fitted Values")
+plot(both_model$fitted.values,both_model$residuals, main="Plot of Residuals against Fitted Values")
 abline(h=0,col="red")
 
 library(MASS)
-boxcox(back_model, lambda = seq(-1, 3, 1/10))
+boxcox(both_model, lambda = seq(-1, 3, 1/10))
 
 ##acf plot of residuals
-acf(back_model$residuals)
+acf(both_model$residuals)
 
 
+# too good to be true -- need to transform the data. Try a sqrt transform?
 
-
-for_model <- lm(formula = sqrt(hc_per100k) ~ share_voters_voted_trump + gini_index + 
+sqrt_model <- lm(formula = sqrt(hc_per100k) ~ share_voters_voted_trump + gini_index + 
                   share_non_white + confederate + elasticity + universl + median_household_income, 
                 data = fbi_df_2016)
 
-back_model <- lm(formula = sqrt(hc_per100k) ~ share_non_citizen + gini_index + share_non_white + 
+
+summary(sqrt_model)
+
+library(MASS)
+boxcox(sqrt_model, lambda = seq(-1, 3, 1/10))
+
+# not too bad, but we might want to rerun the model selection with the newly-transformed data
+
+
+# rerun model selection #
+
+
+# transform variable
+
+fbi_df_2016$hc_per100k<-sqrt(fbi_df_2016$hc_per100k)
+
+# rerun code from above
+
+# no need to rerun correlation analysis since the transformation doesn't change that analysis
+
+pairs(fbi_df_2016, lower.panel=NULL, main = 'FBI 2016')
+
+
+##intercept only model
+regnull <- lm(hc_per100k~1, data=fbi_df_2016)
+##model with all predictors
+regfull <- lm(hc_per100k~., data=fbi_df_2016)
+
+##forward selection, backward elimination, and stepwise regression
+step(regnull, scope=list(lower=regnull, upper=regfull), direction="forward")
+step(regfull, scope=list(lower=regnull, upper=regfull), direction="backward")
+step(regnull, scope=list(lower=regnull, upper=regfull), direction="both")
+
+
+for_model <- lm(formula = hc_per100k ~ share_voters_voted_trump + share_non_white + 
+                  gini_index + confederate + universl + elasticity + share_non_citizen + 
+                  hate_group_count_2016, data = fbi_df_2016)
+
+back_model <- lm(formula = hc_per100k ~ share_non_citizen + gini_index + share_non_white + 
                    share_voters_voted_trump + confederate + elasticity + universl + 
                    hate_group_count_2016, data = fbi_df_2016)
 
-both_model <- lm(formula = sqrt(hc_per100k) ~ share_voters_voted_trump + gini_index + 
-                   share_non_white + confederate + elasticity + universl + median_household_income, 
-                 data = fbi_df_2016)
+both_model <- lm(formula = hc_per100k ~ share_voters_voted_trump + share_non_white + 
+                    gini_index + confederate + universl + elasticity + share_non_citizen + 
+                    hate_group_count_2016, data = fbi_df_2016)
 
 summary(for_model)
 summary(back_model)
 summary(both_model)
 
+# they're all the same! decent adj R^2
 
 
 plot(back_model$fitted.values,back_model$residuals, main="Plot of Residuals against Fitted Values")
@@ -195,89 +234,154 @@ boxcox(back_model, lambda = seq(-1, 3, 1/10))
 ##acf plot of residuals
 acf(back_model$residuals)
 
+model_full<-back_model
+
+# Check to see if step processes produce similar models
+
+##perform all possible regressions (1st order)
+allreg <- regsubsets(hc_per100k ~., data=fbi_df_2016, nbest=9) # sqrt
+
+##create a "data frame" that stores the predictors in the various models considered as well as their various criteria
+best <- as.data.frame(summary(allreg)$outmat)
+best$p <- as.numeric(substr(rownames(best),1,1))+1
+best$r2 <- summary(allreg)$rsq
+best$adjr2 <- summary(allreg)$adjr2
+best$mse <- (summary(allreg)$rss)/(dim(hc_df)[1]-best$p)
+best$cp <- summary(allreg)$cp
+best$bic <- summary(allreg)$bic
+best
+
+##sort by various criteria
+best[order(best$r2,decreasing = TRUE),] # our full_model
+best[order(best$adjr2, decreasing = TRUE),] # our full_model
+best[order(best$mse),] # our full_model
+best[order(best$cp),] # our full_model
+best[order(best$bic),] # not the full model. confederate, and Gini index
+
+bic_mod<-lm(formula = hc_per100k ~ gini_index + confederate, data = fbi_df_2016)
+
+summary(bic_mod)
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+# outlier analysis #
 
 # residuals
 
-res_2016 <- unname(model_2016[['residuals']]) # need to remove the field headers
+res_full <- unname(model_full[['residuals']]) # need to remove the field headers
+#res_2016 # uncomment to see residuals
+res_bic <- unname(bic_mod[['residuals']]) # need to remove the field headers
 #res_2016 # uncomment to see residuals
 
 # outlier, influential & leverage points analysis
 
 # studentized residuals
 
-student.res<-rstandard(model_2016) 
+student.res<-rstandard(model_full) 
 
 # externally studentized residuals
 
-ext.student.res<-rstudent(model_2016) 
+ext.student.res<-rstudent(model_full) 
 
 # plot residuals vs standardized residuals found above
 
 par(mfrow=c(1,3))
-plot(model_2016$fitted.values,res_2016,main="Residuals")
-plot(model_2016$fitted.values,student.res,main="Studentized Residuals")
-plot(model_2016$fitted.values,ext.student.res,main="Externally  Studentized Residuals")
+plot(model_full$fitted.values,res_full,main="Residuals")
+plot(model_full$fitted.values,student.res,main="Studentized Residuals")
+plot(model_full$fitted.values,ext.student.res,main="Externally  Studentized Residuals")
 
 # calc values
 
 n<-length(fbi_df_2016$hc_per100k)
-p<-length(model_2016$coefficients)
+p<-length(model_full$coefficients)
 
 ##critical value using Bonferroni procedure
 qt(1-0.05/(2*n), n-p-1)
 
 sort(ext.student.res)
 
-plot(ext.student.res,main="Externally Studentized Residuals", ylim=c(-4,4))
+#plot(ext.student.res,main="Externally Studentized Residuals", ylim=c(-4,4))
+abline(h=qt(1-0.05/(2*n), n-p-1), col="red")
+abline(h=-qt(1-0.05/(2*n), n-p-1), col="red")
+
+ext.student.res[abs(ext.student.res)>qt(1-0.05/(2*n), n-p-1)]
+
+
+student.res<-rstandard(bic_mod) 
+
+# externally studentized residuals
+
+ext.student.res<-rstudent(bic_mod) 
+
+# plot residuals vs standardized residuals found above
+
+par(mfrow=c(1,3))
+plot(bic_mod$fitted.values,res_bic,main="Residuals")
+plot(bic_mod$fitted.values,student.res,main="Studentized Residuals")
+plot(bic_mod$fitted.values,ext.student.res,main="Externally  Studentized Residuals")
+
+
+# calc values
+
+n<-length(fbi_df_2016$hc_per100k)
+p<-length(model_full$coefficients)
+
+##critical value using Bonferroni procedure
+qt(1-0.05/(2*n), n-p-1)
+
+sort(ext.student.res)
+
+#plot(ext.student.res,main="Externally Studentized Residuals", ylim=c(-4,4))
 abline(h=qt(1-0.05/(2*n), n-p-1), col="red")
 abline(h=-qt(1-0.05/(2*n), n-p-1), col="red")
 
 ext.student.res[abs(ext.student.res)>qt(1-0.05/(2*n), n-p-1)]
 
 ##leverages
-lev<-lm.influence(model_2016)$hat 
+lev_full<-lm.influence(model_full)$hat 
+lev_bic<-lm.influence(bic_mod)$hat 
 
-sort(lev)
+sort(lev_full)
+sort(lev_bic)
 2*p/n
 
-plot(lev, main="Leverages", ylim=c(0,0.4))
+plot(lev_full, main="Leverages", ylim=c(0,0.4))
+abline(h=2*p/n, col="red")
+
+plot(lev_bic, main="Leverages", ylim=c(0,0.4))
 abline(h=2*p/n, col="red")
 
 # get leverage points
 
-lev[lev>2*p/n]
+lev_full[lev_full>2*p/n]
+lev_bic[lev_bic>2*p/n]
+
+# DC very leveraged in BIC
+# DC and Cali are leverage points in full
 
 # influential observations
-DFFITS<-dffits(model_2016)
+DFFITS<-dffits(model_full)
 DFFITS[abs(DFFITS)>2*sqrt(p/n)]
 
-DFBETAS<-dfbetas(model_2016)
+DFBETAS<-dfbetas(model_full)
 DFBETAS[abs(DFBETAS)>2/sqrt(n)]
 
-COOKS<-cooks.distance(model_2016)
+COOKS<-cooks.distance(model_full)
 COOKS[COOKS>qf(0.5,p,n-p)]
 
-# DC is a leverage point
 
+
+# influential observations for BIC
+DFFITS<-dffits(bic_mod)
+DFFITS[abs(DFFITS)>2*sqrt(p/n)]
+
+DFBETAS<-dfbetas(bic_mod)
+DFBETAS[abs(DFBETAS)>2/sqrt(n)]
+
+COOKS<-cooks.distance(bic_mod)
+COOKS[COOKS>qf(0.5,p,n-p)]
+
+
+# check shrinkage models to see if they align with model_full and have decent predictive power
 
 # begin shrinkage analysis
 
@@ -285,16 +389,8 @@ x_2016<-model.matrix(hc_per100k~., fbi_df_2016)[,-1] # remove the first column o
 y_2016<-fbi_df_2016$hc_per100k
 
 
-x_2019<-model.matrix(hc_per100k~., fbi_df_2019)[,-1] # remove the first column of 1s representing the intercept
-y_2019<-fbi_df_2019$hc_per100k
 
-
-x_splc<-model.matrix(hc_per100k~., splc_df_2016)[,-1] # remove the first column of 1s representing the intercept
-y_splc<-splc_df_2016$hc_per100k
-
-
-
-###### Ridge
+###### Lasso
 
 ##alpha=0 for ridge, alpha=1 for LASSO
 ##threshold value should be very small if multicollinearity is present. see what happens if thresh was set to a larger value
@@ -327,55 +423,64 @@ lasso.pred.0<-predict(lasso.mod,newx=x_2016[test,])
 mean((lasso.pred.0-y.test)^2)
 
 ##fit lasso regression using training data
-lasso.mod<-glmnet(x_2016[train,],y_2016[train],alpha=0,lambda=bestlam, thresh = 1e-14)
+lasso.mod.1<-glmnet(x_2016[train,],y_2016[train],alpha=1,lambda=1, thresh = 1e-14)
 
 ##test MSE with lambda=1
-lasso.pred.0<-predict(lasso.mod,newx=x_2016[test,])
-mean((lasso.pred.0-y.test)^2)
+lasso.pred.1<-predict(lasso.mod.1,newx=x_2016[test,])
+mean((lasso.pred.1-y.test)^2)
 
+# perform ridge
+
+##alpha=0 for ridge, alpha=1 for LASSO
+##threshold value should be very small if multicollinearity is present. see what happens if thresh was set to a larger value
+##we know theoretically the coeffs should be the same as lm when lambda is 0
+ridge.r<-glmnet(x_2016,y_2016,alpha=0, lambda=0, thresh = 1e-14)
+coefficients(ridge.r)
+
+##MLR - produce the same thing as above **as long as thresh is small enough
+summary(result_2016)
+
+##split data
+set.seed(12)
+train<-sample(1:nrow(x_2016), nrow(x_2016)/2)
+test<-(-train)
+y.test<-y_2016[test]
+
+##use CV to find optimal lambda based on training set
+set.seed(12)
+cv.out.ridge<-cv.glmnet(x_2016[train,],y_2016[train],alpha=0) # ridge regression
+bestlam.r<-cv.out.ridge$lambda.min # value of lambda that minimizes MSE (the optimal value)
+bestlam.r
+plot(cv.out.ridge)
+
+##fit ridge regression using training data
+ridge.mod<-glmnet(x_2016[train,],y_2016[train],alpha=0,lambda=bestlam.r, thresh = 1e-14)
+
+##test MSE with lambda=1
+ridge.pred.0<-predict(ridge.mod,newx=x_2016[test,])
+mean((ridge.pred.0-y.test)^2)
+
+##fit ridge regression using training data
+ridge.mod.1<-glmnet(x_2016[train,],y_2016[train],alpha=0,lambda=1, thresh = 1e-14)
+
+##test MSE with lambda=1
+ridge.pred.1<-predict(ridge.mod.1,newx=x_2016[test,])
+mean((ridge.pred.1-y.test)^2)
+
+
+
+# lasso produced a slightly lower MSE
 
 
 ##Compare ridge with OLS using best lambda and all observations
 out.lasso<-glmnet(x_2016,y_2016,alpha=1,lambda=bestlam,thresh = 1e-14)
-out.ridge<-glmnet(x_2016,y_2016,alpha=0,lambda=bestlam,thresh = 1e-14)
+out.ridge<-glmnet(x_2016,y_2016,alpha=0,lambda=bestlam.r,thresh = 1e-14)
 out.ols<-glmnet(x_2016,y_2016,alpha=0, lambda=0, thresh = 1e-14)
 cbind(coefficients(out.lasso), coefficients(out.ridge), coefficients(out.ols))
 
-lasso_mod<-lm(hc_per100k~gini_index + share_non_white + 
-                share_voters_voted_trump + confederate + elasticity + hate_group_count_2016 + pk_per100k +median_household_income
-              , fbi_df_2016)
+summary(out.lasso)
 
-summary(lasso_mod)
-
-#########################################
-
-##perform all possible regressions (1st order)
-allreg <- regsubsets(sqrt(hc_per100k) ~., data=fbi_df_2016, nbest=9) # sqrt
-
-##create a "data frame" that stores the predictors in the various models considered as well as their various criteria
-best <- as.data.frame(summary(allreg)$outmat)
-best$p <- as.numeric(substr(rownames(best),1,1))+1
-best$r2 <- summary(allreg)$rsq
-best$adjr2 <- summary(allreg)$adjr2
-best$mse <- (summary(allreg)$rss)/(dim(hc_df)[1]-best$p)
-best$cp <- summary(allreg)$cp
-best$bic <- summary(allreg)$bic
-best
-
-##sort by various criteria
-best[order(best$r2),]
-best[order(best$adjr2, decreasing = TRUE),]
-
-best[order(best$mse),]
-best[order(best$cp),]
-best[order(best$bic),]
-
-
-
-
-anova(back_model)
-
-fbi_df_2016$sqrt_per100k<-sqrt(fbi_df_2016$hc_per100k)
+# LOOCV
 
 n <- nrow(fbi_df_2016) # number of rows (28)
 sum_ressqr <- 0 # start with MSE = 0
@@ -386,85 +491,61 @@ for (i in 1:n) # loop through i = 1 to 28
   testrow <- fbi_df_2016[c(i), ] # test DF is just the ith row
   train_data <- fbi_df_2016[-c(i),] # training data is a DF with every row except the ith
   
-  mod_y <- lm(formula = sqrt_per100k ~ share_non_citizen + gini_index + share_non_white + 
-                share_voters_voted_trump + confederate + elasticity + universl + 
-                hate_group_count_2016, data = train_data) # fit a model to the training data
-  preds<-predict(mod_y,testrow, type="response") # predict the response for the ith row
+  preds<-predict(model_full,testrow, type="response") # predict the response for the ith row
   
-  sum_ressqr <- sum_ressqr + (preds - testrow$sqrt_per100k)^2 # add the res^2 to the cumulative sum 
-  print(preds - sqrt(testrow$sqrt_per100k))
+  sum_ressqr <- sum_ressqr + (preds - testrow$hc_per100k)^2 # add the res^2 to the cumulative sum 
+  print(preds - sqrt(testrow$hc_per100k))
+  
+}
+
+print(sum_ressqr/n) # avg MSE for the LOOCV
+
+sum_ressqr <- 0 # start with MSE = 0
+
+for (i in 1:n) # loop through i = 1 to 28
+{
+  
+  testrow <- fbi_df_2016[c(i), ] # test DF is just the ith row
+  train_data <- fbi_df_2016[-c(i),] # training data is a DF with every row except the ith
+  
+  preds<-predict(bic_mod,testrow, type="response") # predict the response for the ith row
+  
+  sum_ressqr <- sum_ressqr + (preds - testrow$hc_per100k)^2 # add the res^2 to the cumulative sum 
+  print(preds - sqrt(testrow$hc_per100k))
   
 }
 
 print(sum_ressqr/n) # avg MSE for the LOOCV
 
 
+# full_model does slighlty better by MSE
+
+
 # test the above solution
 
 library(boot)
 
-glm.fit<-glm(sqrt_per100k ~ share_non_citizen + gini_index + share_non_white + 
-               share_voters_voted_trump + confederate + elasticity + universl + 
-               hate_group_count_2016, data=fbi_df_2016)
-cv.err<-cv.glm(data, glm.fit)
+glm.fit<-glm(hc_per100k ~ share_voters_voted_trump + share_non_white + 
+               gini_index + confederate + universl + elasticity + share_non_citizen + 
+               hate_group_count_2016, data = fbi_df_2016)
+cv.err<-cv.glm(fbi_df_2016, glm.fit)
 cv.err$delta[1] ##the output for the LOOCV should match your own
-cv.glm(data,glm.fit, K=10)$delta[1] ##k fold CV with k=10
+cv.glm(fbi_df_2016,glm.fit, K=10)$delta[1] ##k fold CV with k=10
 
 
 ##perform levene's test. Null states the variances are equal for all classes. 
 library(lawstat)
-levene.test(fbi_df_2016$sqrt_per100k,fbi_df_2016$confederate) # variances aren't equal
+levene.test(fbi_df_2016$hc_per100k,fbi_df_2016$confederate) # variances aren't equal
 #levene.test(hc_df$fbi_2019_per100k,hc_df$permit) # variances are equal
 #levene.test(hc_df$fbi_2019_per100k,hc_df$universl) # variances are equal
 
 
-##perform Tukey's multiple comparisons
-library(multcomp)
-pairwise<-glht(for_model, linfct = mcp(confederate= "Tukey"))
-summary(pairwise)
-
-
-
-
-
-
-##fit regression with interaction between the 2 predictors
-result<-lm(Quality~Flavor*Region)
-summary(result)
-
-##fit regression with no interaction
-reduced<-lm(Quality~Flavor+Region)
-anova(reduced,result)
-
-##residual plot of model with no interaction
-plot(reduced$fitted.values,reduced$residuals,main="Residual plot")
-abline(h=0,col="red")
-
-##ACF plot of residuals
-acf(reduced$residuals)
-
-##QQ plot of residuals
-qqnorm(reduced$residuals)
-qqline(reduced$residuals, col="red")
-
-##additional assumption to check with categorical predictor. Is the variance of the response variable constant between all classes of the categorical predictor?
-boxplot(Quality~Region, main="Boxplot of Quality Rating by Region")
-
-##perform levene's test. Null states the variances are equal for all classes. 
-library(lawstat)
-levene.test(Quality,Region)
-
-summary(reduced)
+summary(model_full)
 
 ##perform Tukey's multiple comparisons
 library(multcomp)
-pairwise<-glht(reduced, linfct = mcp(Region= "Tukey"))
+pairwise<-glht(model_full, linfct = mcp(confederate= "Tukey"))
 summary(pairwise)
-
-reduced$coef
-
-##obtain the variance-covariance matrix of the coefficients
-vcov(reduced)
 
 
 
@@ -473,23 +554,67 @@ vcov(reduced)
 ###### Interaction analysis
 
 # consider each cut as a subset
-uni_y<-subset(hc_df,universl=="Yes") 
-uni_n<-subset(hc_df,universl=="No")
+con_y<-subset(fbi_df_2016,confederate=="Yes") 
+con_n<-subset(fbi_df_2016,confederate=="No")
 
 
 
 # fit separate regressions
-gini_yes <- lm(fbi_2019_per100k~gini_index,data=uni_y)
-gini_no <- lm(fbi_2019_per100k~gini_index,data=uni_n)
+gini_yes <- lm(hc_per100k~gini_index,data=con_y)
+gini_no <- lm(hc_per100k~gini_index,data=con_n)
 
 # Create scatters:
 
-plot(hc_df$gini_index, hc_df$fbi_2019_per100k, main="log Price by log Carat and Cut")
-points(uni_y$gini_index, uni_y$fbi_2019_per100k, pch=2, col="blue")
-points(uni_n$gini_index, uni_n$fbi_2019_per100k, pch=3, col="red")
+plot(fbi_df_2016$gini_index, fbi_df_2016$hc_per100k, main="confederate")
+points(con_y$gini_index, con_y$hc_per100k, pch=2, col="blue")
+points(con_n$gini_index, con_n$hc_per100k, pch=3, col="red")
 
 
 abline(gini_yes,lty=1, col="blue")
 abline(gini_no,lty=2, col="red") 
 #abline(price_VG,lty=3, col="red")
+
+summary(model_full)
+
+###############
+
+# consider each cut as a subset
+uni_y<-subset(fbi_df_2016,universl=="Yes") 
+uni_n<-subset(fbi_df_2016,universl=="No")
+
+
+# fit separate regressions
+gini_yes <- lm(hc_per100k~share_non_white,data=uni_y)
+gini_no <- lm(hc_per100k~share_non_white,data=uni_n)
+
+# Create scatters:
+
+plot(fbi_df_2016$share_non_white, fbi_df_2016$hc_per100k, main="universl")
+points(uni_y$share_non_white, uni_y$hc_per100k, pch=2, col="blue")
+points(uni_n$share_non_white, uni_n$hc_per100k, pch=3, col="red")
+
+
+abline(gini_yes,lty=1, col="blue")
+abline(gini_no,lty=2, col="red") 
+
+
+inter_model<-lm(formula = hc_per100k ~ share_voters_voted_trump + share_non_white*confederate +
+                                gini_index + confederate + universl + elasticity + share_non_citizen + 
+                                hate_group_count_2016, data = fbi_df_2016)
+
+summary(inter_model)
+
+
+summary(model_full)
+
+
+
+##obtain the variance-covariance matrix of the coefficients
+vcov(model_full)
+
+
+
+
+
+
 
