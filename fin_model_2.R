@@ -9,12 +9,10 @@ hc_df<-read.csv('hate_crimes_full_v2.csv', row.names = 'state_abbrev') # read in
 # We don't really want to use the SPLC data since those data were collected for some period directly after the 2016 election. SPLC also collects HC data in a very specific
 # manner vastly different than how the FBI reports
 
-
 # ensure cat. variables are factors
 hc_df$confederate<-factor(hc_df$confederate) 
 hc_df$permit<-factor(hc_df$permit)
 hc_df$universl<-factor(hc_df$universl)
-
 
 # make police killings per 100k pop
 hc_df$pk_per100k <- hc_df$pk_percap*100000 
@@ -26,104 +24,63 @@ fbi_df_2016<-hc_df[ , !(names(hc_df) %in% c('fbi_2019_per100k', 'hate_crimes_per
                                             'BackChk',	'PewQChng',	'BS1',	'BS2',	'BS3', 'pk_count', 'Number.of.participating.agencies',
                                             'Agencies.submitting.incident.reports', 'pop_covered', 'population', 'incidents', 'pk_percap'))]
 
-
-fbi_df_2019<-hc_df[ , !(names(hc_df) %in% c('avg_hatecrimes_per_100k_fbi', 'hate_crimes_per_100k_splc', 'state_full', 'FIP', 'Year', 
+fbi_df_2019<-hc_df[ , !(names(hc_df) %in% c('average_hatecrimes_per_100k_fbi', 'hate_crimes_per_100k_splc', 'state_full', 'FIP', 'Year', 
                                             'hate_group_count_2019', 'FIP	Year',	'HFR_se',	'BRFSS',	'GALLUP',	'GSS',	'PEW',	'HuntLic',	'GunsAmmo',	
                                             'BackChk',	'PewQChng',	'BS1',	'BS2',	'BS3', 'pk_count', 'Number.of.participating.agencies',
                                             'Agencies.submitting.incident.reports', 'pop_covered', 'population', 'incidents', 'pk_percap'))]
-
-
-splc_df_2016<-hc_df[ , !(names(hc_df) %in% c('avg_hatecrimes_per_100k_fbi', 'fbi_2019_per100k', 'state_full', 'FIP', 'Year', 
-                                             'FIP	Year',	'HFR_se',	'BRFSS',	'GALLUP',	'GSS',	'PEW',	'HuntLic',	'GunsAmmo',	
-                                             'BackChk',	'PewQChng',	'BS1',	'BS2',	'BS3', 'pk_count', 'Number.of.participating.agencies',
-                                             'Agencies.submitting.incident.reports', 'pop_covered', 'population', 'incidents', 'pk_percap'))]
 
 colnames(fbi_df_2016)
 
 # rename hate crime columns to standardize
 fbi_df_2016<-rename(fbi_df_2016, hc_per100k=avg_hatecrimes_per_100k_fbi)
-fbi_df_2019<-rename(fbi_df_2019, hc_per100k=fbi_2019_per100k)
-splc_df_2016<-rename(splc_df_2016, hc_per100k=hate_crimes_per_100k_splc)
 
+fbi_df_2019<-rename(fbi_df_2019, hc_per100k=fbi_2019_per100k)
 
 # drop NAs from HC values
 fbi_df_2016<-fbi_df_2016 %>% drop_na(hc_per100k)
-fbi_df_2019<-fbi_df_2019 %>% drop_na(hc_per100k)
-splc_df_2016<-splc_df_2016 %>% drop_na(hc_per100k)
-
 
 # create box plots of categorical data. Notice difference in shape of confederate data -- confederate states had fewer HCs 
 # remaining two variables do not show the same difference
 
 par(mfrow=c(3,3))
 boxplot(fbi_df_2016$hc_per100k~fbi_df_2016$confederate, main = '2016 FBI')
-boxplot(fbi_df_2019$hc_per100k~fbi_df_2019$confederate, main = '2019 FBI')
-boxplot(splc_df_2016$hc_per100k~splc_df_2016$confederate, main = '2016 SPLC')
 
 boxplot(fbi_df_2016$hc_per100k~fbi_df_2016$permit, main = '2016 FBI')
-boxplot(fbi_df_2019$hc_per100k~fbi_df_2019$permit, main = '2019 FBI')
-boxplot(splc_df_2016$hc_per100k~splc_df_2016$permit, main = '2016 SPLC')
 
 boxplot(fbi_df_2016$hc_per100k~fbi_df_2016$universl, main = '2016 FBI')
-boxplot(fbi_df_2019$hc_per100k~fbi_df_2019$universl, main = '2019 FBI')
-boxplot(splc_df_2016$hc_per100k~splc_df_2016$universl, main = '2016 SPLC')
-
 
 # not much to see in the scatter matrix. DC sticks out a lot as far as hate crimes, and we notice some heavy correlation between variables. Will want to 
 # explore DC during outlier analysis
 
 
 pairs(fbi_df_2016, lower.panel=NULL)
-pairs(fbi_df_2019, lower.panel=NULL)
-pairs(splc_df_2016, lower.panel=NULL)
 
 
 # fit the full data -- not helpful except to look at correlation/multicollinearity
 
 model_2016<-lm(hc_per100k~., data = fbi_df_2016)
-model_2019<-lm(hc_per100k~., data = fbi_df_2019)
-model_splc<-lm(hc_per100k~., data = splc_df_2016)
-
 
 # run VIF. notice high values (like HFR, suicide rates, share_population_in_metro_areas). We will remove these
 
 vif(model_2016) # HFR is highly correlated (18+ VIF)
 
-vif(model_2019) # HFR is highly correlated (18+ VIF)
-
-vif(model_splc) # HFR is highly correlated (18+ VIF)
-
 # remove correlated variables
 
-splc_df_2016<-splc_df_2016[ , !(names(splc_df_2016) %in% c('median_household_income', 'Fem_FS_S', 'share_population_in_metro_areas', 'HFR', 'share_population_with_high_school_degree', 'hate_group_count_2019'))] 
 fbi_df_2016<-fbi_df_2016[ , !(names(fbi_df_2016) %in% c('share_non_citizen', 'median_household_income', 'Fem_FS_S', 'Male_FS_S', 'share_population_in_metro_areas', 'HFR', 'share_population_with_high_school_degree'))] 
-fbi_df_2019<-fbi_df_2019[ , !(names(fbi_df_2019) %in% c('Fem_FS_S', 'Male_FS_S', 'share_population_in_metro_areas', 'HFR', 'share_population_with_high_school_degree'))] 
 
 # fit models again and run VIF
 
 model_2016<-lm(hc_per100k~., data = fbi_df_2016)
-model_2019<-lm(hc_per100k~., data = fbi_df_2019)
-model_splc<-lm(hc_per100k~., data = splc_df_2016)
 
 vif(model_2016) # HFR is highly correlated (18+ VIF)
-
-vif(model_2019) # HFR is highly correlated (18+ VIF)
-
-vif(model_splc) # HFR is highly correlated (18+ VIF)
 
 # check model summaries
 
 summary(model_2016)
-summary(model_2019)
-summary(model_splc)
-
 
 # produce scatter matrices again
 
 pairs(fbi_df_2016, lower.panel=NULL, main = 'FBI 2016')
-pairs(fbi_df_2019, lower.panel=NULL, main = 'FBI 2019')
-pairs(splc_df_2016, lower.panel=NULL, main = 'SPLC 2016')
-
 
 # model selection #
 
@@ -166,8 +123,8 @@ acf(both_model$residuals)
 
 # too good to be true -- need to transform the data. Try a sqrt transform?
 
-sqrt_model <- lm(formula = sqrt(hc_per100k) ~ share_voters_voted_trump + gini_index + 
-                   share_non_white + confederate + elasticity + universl, data = fbi_df_2016)
+sqrt_model <- lm(formula = sqrt(hc_per100k) ~ gini_index + share_non_white + share_voters_voted_trump + 
+                   confederate + elasticity + universl, data = fbi_df_2016)
 
 
 summary(sqrt_model)
@@ -233,7 +190,7 @@ boxcox(back_model, lambda = seq(-1, 3, 1/10))
 acf(back_model$residuals)
 
 
-fin_vars<-c('hc_per100k', 'gini_index', 'gini_index', 
+fin_vars<-c('hc_per100k', 'gini_index', 'share_non_white',
             'share_voters_voted_trump', 'confederate', 'universl', 'elasticity')
 
 
@@ -247,9 +204,9 @@ model_full<-lm(hc_per100k~., data = fin_data)
 
 summary(model_full)
 
-red<-lm(hc_per100k~gini_index+gini_index+share_voters_voted_trump+confederate+universl, fin_data)
+red<-lm(hc_per100k~gini_index+share_non_white+share_voters_voted_trump+confederate+universl, fin_data)
 
-anova(red, model_full)
+anova(red, model_full) # variables are not significant with alpha = 0.05
 
 # Check to see if step processes produce similar models
 
@@ -308,6 +265,8 @@ plot(model_full$fitted.values,ext.student.res,main="Externally  Studentized Resi
 
 n<-length(fin_data$hc_per100k)
 p<-length(model_full$coefficients)
+p2<-length(bic_mod$coefficients)
+
 
 ##critical value using Bonferroni procedure
 qt(1-0.05/(2*n), n-p-1)
@@ -323,9 +282,8 @@ ext.student.res[abs(ext.student.res)>qt(1-0.05/(2*n), n-p-1)]
 
 student.res<-rstandard(bic_mod) 
 
-# externally studentized residuals
 
-ext.student.res<-rstudent(bic_mod) 
+
 
 # plot residuals vs standardized residuals found above
 
@@ -334,22 +292,19 @@ plot(bic_mod$fitted.values,res_bic,main="Residuals")
 plot(bic_mod$fitted.values,student.res,main="Studentized Residuals")
 plot(bic_mod$fitted.values,ext.student.res,main="Externally  Studentized Residuals")
 
-
-# calc values
-
-n<-length(fbi_df_2016$hc_per100k)
-p<-length(model_full$coefficients)
+# externally studentized residuals
+ext.student.res<-rstudent(bic_mod) 
 
 ##critical value using Bonferroni procedure
-qt(1-0.05/(2*n), n-p-1)
+qt(1-0.05/(2*n), n-p2-1)
 
 sort(ext.student.res)
 
 plot(ext.student.res,main="Externally Studentized Residuals", ylim=c(-4,4))
-abline(h=qt(1-0.05/(2*n), n-p-1), col="red")
-abline(h=-qt(1-0.05/(2*n), n-p-1), col="red")
+abline(h=qt(1-0.05/(2*n), n-p2-1), col="red")
+abline(h=-qt(1-0.05/(2*n), n-p2-1), col="red")
 
-ext.student.res[abs(ext.student.res)>qt(1-0.05/(2*n), n-p-1)]
+ext.student.res[abs(ext.student.res)>qt(1-0.05/(2*n), n-p2-1)]
 
 ##leverages
 lev_full<-lm.influence(model_full)$hat 
@@ -357,21 +312,21 @@ lev_bic<-lm.influence(bic_mod)$hat
 
 sort(lev_full)
 sort(lev_bic)
-2*p/n
 
-plot(lev_full, main="Leverages", ylim=c(0,0.4))
+
+plot(lev_full, main="Leverages", ylim=c(0,0.6))
 abline(h=2*p/n, col="red")
 
 plot(lev_bic, main="Leverages", ylim=c(0,0.4))
-abline(h=2*p/n, col="red")
+abline(h=2*p2/n, col="red")
 
 # get leverage points
 
 lev_full[lev_full>2*p/n]
-lev_bic[lev_bic>2*p/n]
+lev_bic[lev_bic>2*p2/n]
 
-# DC very leveraged in BIC
-# DC and Cali are leverage points in full
+# DC and NY very leveraged in BIC
+# DC leveraged in full
 
 # influential observations
 DFFITS<-dffits(model_full)
@@ -387,13 +342,13 @@ COOKS[COOKS>qf(0.5,p,n-p)]
 
 # influential observations for BIC
 DFFITS<-dffits(bic_mod)
-DFFITS[abs(DFFITS)>2*sqrt(p/n)]
+DFFITS[abs(DFFITS)>2*sqrt(p2/n)]
 
 DFBETAS<-dfbetas(bic_mod)
 DFBETAS[abs(DFBETAS)>2/sqrt(n)]
 
 COOKS<-cooks.distance(bic_mod)
-COOKS[COOKS>qf(0.5,p,n-p)]
+COOKS[COOKS>qf(0.5,p2,n-p2)]
 
 
 # check shrinkage models to see if they align with model_full and have decent predictive power
@@ -645,17 +600,17 @@ print(sum_ressqr/n) # avg MSE for the LOOCV
 
 # full_model does better by MSE
 
+summary(model_full)
 
 # test the above solution
 
 library(boot)
 
 glm.fit<-glm(hc_per100k ~ share_voters_voted_trump + share_non_white + 
-               gini_index + confederate + universl + elasticity + 
-               hate_group_count_2016, data = fbi_df_2016)
+               gini_index + confederate + universl + elasticity, data = fbi_df_2016)
 cv.err<-cv.glm(fbi_df_2016, glm.fit)
 cv.err$delta[1] ##the output for the LOOCV should match your own
-cv.glm(fbi_df_2016,glm.fit, K=10)$delta[1] ##k fold CV with k=10
+cv.glm(fbi_df_2016,glm.fit, K=50)$delta[1] ##k fold CV with k=10
 
 
 ##perform levene's test. Null states the variances are equal for all classes. 
@@ -698,7 +653,7 @@ summary(pairwise)
 con_y<-subset(fbi_df_2016,confederate=="Yes") 
 con_n<-subset(fbi_df_2016,confederate=="No")
 
-
+# gini
 
 # fit separate regressions
 gini_yes <- lm(hc_per100k~gini_index,data=con_y)
@@ -725,8 +680,50 @@ uni_n<-subset(fbi_df_2016,universl=="No")
 
 
 # fit separate regressions
-gini_yes <- lm(hc_per100k~share_non_white,data=uni_y)
-gini_no <- lm(hc_per100k~share_non_white,data=uni_n)
+gini_yes <- lm(hc_per100k~gini_index,data=uni_y)
+gini_no <- lm(hc_per100k~gini_index,data=uni_n)
+
+# Create scatters:
+
+plot(fbi_df_2016$gini_index, fbi_df_2016$hc_per100k, main="universl")
+points(uni_y$gini_index, uni_y$hc_per100k, pch=2, col="blue")
+points(uni_n$gini_index, uni_n$hc_per100k, pch=3, col="red")
+
+
+abline(gini_yes,lty=1, col="blue")
+abline(gini_no,lty=2, col="red") 
+
+# slopes differ
+
+
+# check others #
+ 
+# non-white
+
+# fit separate regressions
+nw_yes <- lm(hc_per100k~share_non_white,data=con_y)
+nw_no <- lm(hc_per100k~share_non_white,data=con_n)
+
+# Create scatters:
+
+plot(fbi_df_2016$share_non_white, fbi_df_2016$hc_per100k, main="confederate")
+points(con_y$share_non_white, con_y$hc_per100k, pch=2, col="blue")
+points(con_n$share_non_white, con_n$hc_per100k, pch=3, col="red")
+
+
+abline(nw_yes,lty=1, col="blue")
+abline(nw_no,lty=2, col="red") 
+#abline(price_VG,lty=3, col="red")
+
+summary(model_full)
+
+###############
+
+
+
+# fit separate regressions
+nw_yes <- lm(hc_per100k~share_non_white,data=uni_y)
+nw_no <- lm(hc_per100k~share_non_white,data=uni_n)
 
 # Create scatters:
 
@@ -735,23 +732,86 @@ points(uni_y$share_non_white, uni_y$hc_per100k, pch=2, col="blue")
 points(uni_n$share_non_white, uni_n$hc_per100k, pch=3, col="red")
 
 
-abline(gini_yes,lty=1, col="blue")
-abline(gini_no,lty=2, col="red") 
+abline(nw_yes,lty=1, col="blue")
+abline(nw_no,lty=2, col="red") 
+
+# seems to be interaction
 
 
-inter_model<-lm(formula = hc_per100k ~ gini_index + share_voters_voted_trump + share_voters_voted_trump*universl
-                                 +  share_non_white*confederate, data = fbi_df_2016)
+# fit separate regressions
+el_yes <- lm(hc_per100k~elasticity,data=con_y)
+el_no <- lm(hc_per100k~elasticity,data=con_n)
+
+# Create scatters:
+
+plot(fbi_df_2016$elasticity, fbi_df_2016$hc_per100k, main="confederate")
+points(con_y$elasticity, con_y$hc_per100k, pch=2, col="blue")
+points(con_n$elasticity, con_n$hc_per100k, pch=3, col="red")
 
 
-all_inter<-lm(formula = hc_per100k ~ .^2, data = fin_data)
+abline(el_yes,lty=1, col="blue")
+abline(el_no,lty=2, col="red") 
+#abline(price_VG,lty=3, col="red")
 
-summary(all_inter)
-summary(inter_model) # no instances of Yes and Yes for confederate and universl
+
+# not a large diff in slope
+
+summary(model_full)
+
+###############
+
+
+
+# fit separate regressions
+el_yes <- lm(hc_per100k~elasticity,data=uni_y)
+el_no <- lm(hc_per100k~elasticity,data=uni_n)
+
+# Create scatters:
+
+plot(fbi_df_2016$elasticity, fbi_df_2016$hc_per100k, main="universl")
+points(uni_y$elasticity, uni_y$hc_per100k, pch=2, col="blue")
+points(uni_n$elasticity, uni_n$hc_per100k, pch=3, col="red")
+
+
+abline(el_yes,lty=1, col="blue")
+abline(el_no,lty=2, col="red") 
+
+# seems to be interaction
+
+summary(model_full)
+
+
+inter_full<-lm(formula = hc_per100k ~ .^2, data = fin_data)
+
+summary(inter_full)
+
+inter_1<-lm(formula = hc_per100k ~ gini_index*universl + gini_index*confederate
+            + share_non_white*universl + share_non_white*confederate
+            + share_voters_voted_trump*universl + share_voters_voted_trump*confederate
+            + elasticity*universl + elasticity*confederate, data = fin_data)
+
+summary(inter_1)
+
+# start removing preds and check partial F
+
+red_inter_1 <-lm(formula = hc_per100k ~ gini_index + share_non_white*confederate
+                 + share_voters_voted_trump
+                 , data = fin_data)
+
+summary(red_inter_1)
+anova(inter_1, red_inter_1)
+
+inter_model_2<-lm(formula = hc_per100k ~ gini_index + share_voters_voted_trump*universl
+                  +  share_non_white*confederate + gini_index*share_non_white, data = fbi_df_2016)
+
+
+summary(inter_1) # gini_index interacting with cat variables isn't significant
+summary(inter_model_2)# no instances of Yes and Yes for confederate and universl
 summary(model_full)
 
 mod_full_ex<-lm(hc_per100k~gini_index+share_non_white+share_voters_voted_trump+confederate+universl, data = fbi_df_2016)
 
-summary(model_full_ex)
+summary(mod_full_ex)
 
 inter_red<-lm(formula = hc_per100k ~ gini_index + share_voters_voted_trump +
                  +  share_non_white*confederate, data = fbi_df_2016)
@@ -759,7 +819,9 @@ inter_red<-lm(formula = hc_per100k ~ gini_index + share_voters_voted_trump +
 
 anova(inter_red, inter_model) # cannot remove some of the terms and use the inter_red model
 
-summary(inter_model)
+inter_model<-lm(formula = hc_per100k ~ gini_index + share_voters_voted_trump*universl + share_non_white*confederate, data = fbi_df_2016)
+
+summary(inter_model) # hierarchical principle: higher order (interaction) terms are significant, so must leave lower-order terms in
 
 
 source("http://pcwww.liv.ac.uk/~william/R/crosstab.r")
@@ -767,9 +829,11 @@ crosstab(fbi_df_2016, row.vars = "confederate", col.vars = "universl", type = "f
 ##obtain the variance-covariance matrix of the coefficients
 vcov(model_full)
 
+# check if it predicts 2019 HC data well
 
+fbi_df_2019$hc_per100k<-sqrt(fbi_df_2019$hc_per100k)
 
-n <- nrow(fbi_df_2019) # number of rows (28)
+n <- nrow(fbi_df_2016) # number of rows (28)
 sum_ressqr <- 0 # start with MSE = 0
 
 for (i in 1:n) # loop through i = 1 to 28
@@ -788,6 +852,31 @@ for (i in 1:n) # loop through i = 1 to 28
 }
 
 print(sum_ressqr/n) # avg MSE for the LOOCV
+
+
+# 2019
+
+n <- nrow(fbi_df_2019) # number of rows (28)
+sum_ressqr <- 0 # start with MSE = 0
+
+for (i in 1:n) # loop through i = 1 to 28
+{
+  
+  testrow <- fbi_df_2019[c(i), ] # test DF is just the ith row
+  train_data <- fbi_df_2019[-c(i),] # training data is a DF with every row except the ith
+  
+  preds<-predict(inter_model,testrow, type="response") # predict the response for the ith row
+  
+  sum_ressqr <- sum_ressqr + (preds - testrow$hc_per100k)^2 # add the res^2 to the cumulative sum 
+  #print((preds - testrow$hc_per100k)/testrow$hc_per100k)
+  print(preds - testrow$hc_per100k)
+  print(preds)
+  
+}
+
+print(sum_ressqr/n) # avg MSE for the LOOCV
+
+# not the best
 
 
 
