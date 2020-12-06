@@ -1,0 +1,137 @@
+
+\documentclass{article}
+\usepackage{textgreek, amsthm, amssymb, amsmath, stackengine, graphicx, subcaption, textcomp}
+\graphicspath{ {}} 
+\usepackage[margin= 1.25in]{geometry}
+\usepackage{ tipa }
+\begin{document}
+\begin{flushleft}
+
+
+\textbf{Homework: Module 11}
+\newline
+
+
+David Fuentes (dmf4ns@virginia.edu) \newline
+Due: November 17th, 2020 \newline
+
+1 a) Explain why fitting a simple linear regression model with autocorrelated errors is a better choice than a simple linear regression model with i.i.d. errors for this data set.\newline
+
+Since the response data are quarterly sales for a specific company and the predictor data are the quarterly sales for the entire industry, it would make sense that the sales and errors at $Q_t$ would be dependent on the sales at $Q_{t-i}$ for some $i\leq t$; both the response and predictor variables are dependent on their past sales numbers (they're \emph{time dependent} and likely to be correlated). The response variable is also dependent on the predictor during a given quarter and vice versa. If we ran a SLR with i.i.d. errors, we could miscalculate the true error variance $\sigma^2$ because of the likely autocorrelation of the errors, thus compromising the predictive ability of the model. This is all to say that our typical regression analysis is inappropriate and we must account for the autocorrelated errors.\newline
+
+b) Use the Cochrane-Orcutt method to fit a simple linear regression model with AR(1) errors.\newline
+
+Code is in the R file attached.\newline
+
+i. Report the estimated autocorrelation at lag 1 for the errors.\newline
+\begin{center}
+\includegraphics[scale = .6]{pacf}
+\end{center}
+
+The estimated autocorrelation for the errors at lag one is about 0.644, as seen from the partial ACF in R. \newline
+
+ii. Write out the model with the estimated values of the coefficients.\newline
+
+The model with AR(1) errors is
+\begin{align*}
+y'_t = -0.342054 + 0.173045\times x'_t
+\end{align*}
+
+iii. Assess if the regression model assumptions are met.\newline
+
+We will check the assumptions that the residuals have mean zero and constant variance using the standard residual plots from the transformed model:
+
+\begin{center}
+\includegraphics[scale = .6]{residuals}
+\end{center}
+
+The dataset isn't very large, so it's a bit hard to gauge the assumptions from the residual plot.\newline
+
+The residuals appear to have a relatively-even scatter of similar total magnitude on either side of the residuals = 0 line, so the mean of the residuals appear to be zero. \newline
+
+Again, since the dataset is small, it's hard to gauge the constant-variance assumption. There's definitely no pattern in the residuals, and they don't seem to fan out or contract over $\hat{y}$. It appears that they are relatively constant, though there are a few points slightly out of the band between about 0.05 and -0.05.\newline
+
+To help, we ran a Box-Cox plot, which can be used to identify power transformations that can correct for non-constant variance. If $\lambda=1$ is in our confidence interval as seen in the graph, we can more confidently assume that the residuals are of constant variance. 
+\begin{center}
+\includegraphics[scale = .6]{boxcox}
+\end{center}
+
+We see that $\lambda=1$ is in our significance band, which analytically shows that the residual variance is constant at our level of significance. \newline
+
+We next created an ACF plot in R:
+\begin{center}
+\includegraphics[scale = .6]{acf}
+\end{center}
+
+The plot shows that the transformed model's residuals are no longer autocorrelated since the ACF at each lag value greater than 0 (lag at zero is always 1) is within our significance range. \newline
+
+Lastly, we will check the normality assumption on the residuals with a normal Q-Q plot:
+\begin{center}
+\includegraphics[scale = .6]{qq}
+\end{center}
+
+The residuals deviate from the line representing a normal distribution, particularly at the tails, but this assumption has been proved to be less essential to regression analysis. As such, we will ignore the deviations.\newline
+
+Since the primary assumptions are met as described above, it is appropriate to use this regression model on the transformed data.\newline
+
+iv. Are the seasonally adjusted quarterly sales for the McGill Company significantly linearly related to the seasonally adjusted quarterly sales for the entire industry? Be sure to state the hypothesis statements, test statistic, and pvalue, as well as an appropriate conclusion in context.\newline
+
+To answer this question, we will test $H_0: \beta'_{\text{ind}} = 0$ and $H_a: \beta'_{\text{ind}} \neq 0$ with $\alpha=0.05$. Since we know that $\beta'_{\text{ind}}=\beta_{\text{ind}}$, it follows that the hypotheses can be rewritten as $H_0: \beta_{\text{ind}} = 0$ and $H_a: \beta_{\text{ind}} \neq 0$.
+
+From the summary output in R, we see a $t$-value of 52.419 and a $p$-value smaller than \texttt{2.2e-16} on $\beta_{\text{ind}}$, which is much less than our $\alpha$. In the context of the problem, we reject $H_0$, and instead support $H_a$, that $ \beta_{\text{ind}} \neq 0$. Stated another way, we support that there is a linear relationship between the seasonally adjusted quarterly sales for the McGill Company and the seasonally adjusted quarterly sales for the entire industry.\newline
+
+2) Show how to apply the Cochrane-Orcutt method to a multiple linear regression model with AR(1) errors, i.e. what kind of transformations to the variables need to be made. Show how you derived your answer.\newline
+
+As with SLR, we similarly want to transform the response variable so that $y'_t=y_t-\phi y_{t-1}$. \newline
+
+In MLR, this becomes 
+\begin{align*}
+y'_t&=y_t-\phi y_{t-1}\\
+&= \beta_0+\beta_1x_{1,t}+\beta_2x_{2,t}+...+\beta_kx_{k,t}+\epsilon_{t}\\
+&-\phi( \beta_0+\beta_1x_{1,t-1}+\beta_2x_{2,t-1}+...+\beta_kx_{k,t-1} - \epsilon_{t-1})\\
+\end{align*}
+
+Which becomes
+\begin{align*}
+\beta_0(1-\phi)&+\beta_1(x_{1,t}-\phi x_{1,t-1})+\beta_2(x_{2,t}-\phi x_{2,t-1}) \\
+&+ ... + \beta_k(x_{k,t}-\phi x_{k,t-1})+\epsilon_t -\phi\epsilon_{t-1}\\
+=\beta_0' &+ \beta_1x'_{1,t}+ \beta_2x'_{2,t}+...+\beta_kx'_{k,t}+a_t
+\end{align*}
+
+Where $\beta_0' = \beta_0(1-\phi)$ is a constant, $x'_{i,t}= (x_{i,t}-\phi x_{i,t-1})$ $1\leq i \leq k$, and $a_t = \epsilon_t -\phi\epsilon_{t-1}$.\newline
+
+3) Consider applying the Cochrane-Orcutt method, but now to a simple linear regression with AR(2) errors, where $\epsilon_t =\phi_1\epsilon_{t-1}+\phi_2\epsilon_{t-2} + a_t$.\newline
+
+a) Show how the Cochrane-Orcutt method should be applied, i.e. what kind of transformations to the variables need to be made. Show how you derived your answer.\newline
+
+For AR(2), we want to transform the response variable such that $y'_t=y_t-\phi_1 y_{t-1}-\phi_2 y_{t-2}$.\newline
+
+Plugging in the SLR model and expanding,
+\begin{align*}
+y'_t&=\beta_0+\beta_1x_t+\epsilon_t - \phi_1(\beta_0+\beta_1x_{t-1}+\epsilon_{t-1})-\phi_2(\beta_0+\beta_1x_{t-2}+\epsilon_{t-2})\\
+&=\beta_0(1-\phi_1-\phi_2)+\beta_1(x_t-\phi_1x_{t-1}-\phi_2x_{t-2})+\epsilon_t-\phi_1\epsilon_{t-1}-\phi_2\epsilon_{t-2}\\
+&=\beta'_0 +\beta_1x'_t+a_t
+\end{align*}
+Where $\beta_0' = \beta_0(1-\phi_1-\phi_2)$ is a constant, $x'_t = x_t-\phi_1x_{t-1}-\phi_2x_{t-2}$, and $a_t=\epsilon_t-\phi_1\epsilon_{t-1}-\phi_2\epsilon_{t-2}$.\newline
+
+b) What do you think are the transformations to the variables for a simple linear regression model with AR(p) errors, where p is a positive integer. You do not have to show how you arrived at your answer.\newline
+
+The generalized transformation for $p$ is
+\begin{align*}
+y'_t=&\beta_0+\beta_1x_t+\epsilon_t - \phi_1(\beta_0+\beta_1x_{t-1}+\epsilon_{t-1})\\
+&-\phi_2(\beta_0+\beta_1x_{t-2}+\epsilon_{t-2})-...-\phi_p(\beta_0+\beta_1x_{t-p}+\epsilon_{t-p})\\
+=&\beta_0(1-\phi_1-...-\phi_p)+\beta_1(x_t-\phi_1x_{t-1}-...-\phi_px_{t-p})\\
+&+\epsilon_t-\phi_1\epsilon_{t-1}-...-\phi_p\epsilon_{t-p}\\
+=&\beta'_0+\beta_1(x_t-\sum_{i=1}^p \phi_ix_{t-i}) + \epsilon_t - \sum_{i=1}^p\phi_i\epsilon_{t-i}
+\end{align*}
+
+\pagebreak
+4. Submit your group’s code and estimated test MSE from guided question set 11.\newline
+
+\begin{flushleft}
+\includegraphics[scale = .7]{rsnap}
+\end{flushleft}
+Estimated test MSE is \texttt{3.123615}. See R file for the code.
+
+\end{flushleft}
+\end{document}
