@@ -10,9 +10,6 @@ hc_df<-read.csv('hate_crimes_full_v2.csv', row.names = 'state_abbrev') # read in
 # manner vastly different than how the FBI reports
 
 # ensure cat. variables are factors
-hc_df$confederate<-factor(hc_df$confederate) 
-hc_df$permit<-factor(hc_df$permit)
-hc_df$universl<-factor(hc_df$universl)
 hc_df$con_uni_combo<-factor(hc_df$con_uni_combo)
 
 # make police killings per 100k pop
@@ -23,18 +20,21 @@ hc_df$pk_per100k <- hc_df$pk_percap*100000
 fbi_df_2016<-hc_df[ , !(names(hc_df) %in% c('fbi_2019_per100k', 'hate_crimes_per_100k_splc', 'state_full', 'FIP', 'Year', 'confederate', 'universl',
                                             'hate_group_count_2019', 'FIP	Year',	'HFR_se',	'BRFSS',	'GALLUP',	'GSS',	'PEW',	'HuntLic',	'GunsAmmo',	
                                             'BackChk',	'PewQChng',	'BS1',	'BS2',	'BS3', 'pk_count', 'Number.of.participating.agencies',
-                                            'Agencies.submitting.incident.reports', 'pop_covered', 'population', 'incidents', 'pk_percap'))]
+                                            'Agencies.submitting.incident.reports', 'pop_covered', 'population', 'incidents'))]
 
 fbi_df_2019<-hc_df[ , !(names(hc_df) %in% c('average_hatecrimes_per_100k_fbi', 'hate_crimes_per_100k_splc', 'state_full', 'FIP', 'Year', 'confederate', 'universl',
                                             'hate_group_count_2019', 'FIP	Year',	'HFR_se',	'BRFSS',	'GALLUP',	'GSS',	'PEW',	'HuntLic',	'GunsAmmo',	
                                             'BackChk',	'PewQChng',	'BS1',	'BS2',	'BS3', 'pk_count', 'Number.of.participating.agencies',
-                                            'Agencies.submitting.incident.reports', 'pop_covered', 'population', 'incidents', 'pk_percap'))]
+                                            'Agencies.submitting.incident.reports', 'pop_covered', 'population', 'incidents'))]
 
 colnames(fbi_df_2016)
 
 levels(fbi_df_2016$con_uni_combo)
 fbi_df_2016$con_uni_combo<-relevel(fbi_df_2016$con_uni_combo, ref = "Neither")
 levels(fbi_df_2016$con_uni_combo)
+
+fbi_df_2019$con_uni_combo<-relevel(fbi_df_2019$con_uni_combo, ref = "Neither")
+levels(fbi_df_2019$con_uni_combo)
 
 
 # rename hate crime columns to standardize
@@ -48,12 +48,11 @@ fbi_df_2016<-fbi_df_2016 %>% drop_na(hc_per100k)
 # create box plots of categorical data. Notice difference in shape of confederate data -- confederate states had fewer HCs 
 # remaining two variables do not show the same difference
 
-par(mfrow=c(3,3))
-boxplot(fbi_df_2016$hc_per100k~fbi_df_2016$confederate, main = '2016 FBI')
+par(mfrow=c(1,2))
+boxplot(fbi_df_2016$hc_per100k~fbi_df_2016$con_uni_combo, main = '2016 FBI')
 
-boxplot(fbi_df_2016$hc_per100k~fbi_df_2016$permit, main = '2016 FBI')
+boxplot(fbi_df_2019$hc_per100k~fbi_df_2019$con_uni_combo, main = '2019 FBI')
 
-boxplot(fbi_df_2016$hc_per100k~fbi_df_2016$universl, main = '2016 FBI')
 
 # not much to see in the scatter matrix. DC sticks out a lot as far as hate crimes, and we notice some heavy correlation between variables. Will want to 
 # explore DC during outlier analysis
@@ -72,7 +71,7 @@ vif(model_2016) # HFR is highly correlated (18+ VIF)
 
 # remove correlated variables
 
-fbi_df_2016<-fbi_df_2016[ , !(names(fbi_df_2016) %in% c('share_non_citizen', 'median_household_income', 'Fem_FS_S', 'Male_FS_S', 'share_population_in_metro_areas', 'HFR', 'share_population_with_high_school_degree'))] 
+fbi_df_2016<-fbi_df_2016[ , !(names(fbi_df_2016) %in% c('pk_per100k', 'share_non_citizen', 'median_household_income', 'Fem_FS_S', 'Male_FS_S', 'share_population_in_metro_areas', 'HFR', 'share_population_with_high_school_degree'))] 
 
 # fit models again and run VIF
 
@@ -86,7 +85,7 @@ summary(model_2016)
 
 # produce scatter matrices again
 
-pairs(fbi_df_2016, lower.panel=NULL, main = 'FBI 2016')
+pairs(fbi_df_2016, lower.panel=NULL, main = 'FBI 2016, post Multicollinearity Analysis')
 
 # model selection #
 
@@ -117,11 +116,13 @@ summary(both_model)
 
 # all produce the same models Relatively high adj R^2 and significant t-vals
 
+par(mfrow=c(1,3))
+
 plot(both_model$fitted.values,both_model$residuals, main="Plot of Residuals against Fitted Values")
 abline(h=0,col="red")
 
 library(MASS)
-boxcox(both_model, lambda = seq(-1, 3, 1/10))
+boxcox(both_model, lambda = seq(-2, 3, 1/10), main="Box Cox, Model 1")
 
 ##acf plot of residuals
 acf(both_model$residuals)
@@ -135,8 +136,14 @@ sqrt_model <- lm(formula = sqrt(hc_per100k) ~ share_voters_voted_trump + gini_in
 
 summary(sqrt_model)
 
+plot(sqrt_model$fitted.values,sqrt_model$residuals, main="Plot of Residuals against Fitted Values, post Transform")
+abline(h=0,col="red")
+
 library(MASS)
-boxcox(sqrt_model, lambda = seq(-1, 3, 1/10))
+boxcox(sqrt_model, lambda = seq(-2, 4, 1/10), main="Box Cox, sqrt Y")
+
+##acf plot of residuals
+acf(sqrt_model$residuals)
 
 # not too bad, but we might want to rerun the model selection with the newly-transformed data
 
@@ -179,18 +186,22 @@ summary(for_model)
 summary(back_model)
 summary(both_model)
 
-# they're all the same! decent adj R^2
+# they're all the same! decent adj R^2. Also the same as the models found in part 1,
+# just with transformed response
 
 full_sqrt<-lm(hc_per100k~., data = fbi_df_2016)
 
 vif(full_sqrt)
 
+# no multicollinearity, which makes sense since the transformation shouldn't have changed that
+
+par(mfrow=c(1,3))
 
 plot(back_model$fitted.values,back_model$residuals, main="Plot of Residuals against Fitted Values")
 abline(h=0,col="red")
 
 library(MASS)
-boxcox(back_model, lambda = seq(-1, 3, 1/10))
+boxcox(back_model, lambda = seq(-1, 4, 1/10))
 
 ##acf plot of residuals
 acf(back_model$residuals)
@@ -210,7 +221,7 @@ model_full<-lm(hc_per100k~., data = fin_data)
 
 summary(model_full)
 
-red<-lm(hc_per100k~gini_index+share_voters_voted_trump+share_non_white+con_uni_combo, fin_data) # tested without share_non_white and trump share, but they're significant; remove elasticity
+red<-lm(hc_per100k~gini_index+share_voters_voted_trump+share_non_white+con_uni_combo, fin_data) # tested without elasticity, but they're significant; remove elasticity
 
 anova(red, model_full) # elasticity is not significant with alpha = 0.05
 
@@ -236,7 +247,7 @@ best[order(best$mse),] # our full_model
 best[order(best$cp),] # our full_model
 best[order(best$bic),] # not the full model. confederate, and Gini index
 
-
+# mostly produce the same model as above (with elasticity, which we've determined isn't significant)
 # same model with hate group might be decent. will check 
 
 hategroup_mod<-lm(formula = hc_per100k ~ share_voters_voted_trump + share_non_white + hate_group_count_2016 +
@@ -260,7 +271,6 @@ hategroup_mod_red<-lm(formula = hc_per100k ~ share_voters_voted_trump + share_no
 
 
 anova(hategroup_mod, hategroup_mod_red)
-anova(hategroup_mod, red)
 
 # partial F says it's not significant (cannot reject H_0, that its slope's 0)
 
@@ -286,8 +296,7 @@ student.res<-rstandard(best_mod)
 
 ext.student.res<-rstudent(best_mod) 
 
-# plot residuals vs standardized residuals found above
-
+sort(ext.student.res)
 par(mfrow=c(1,3))
 plot(best_mod$fitted.values,res_full,main="Residuals")
 plot(best_mod$fitted.values,student.res,main="Studentized Residuals")
@@ -295,21 +304,22 @@ plot(best_mod$fitted.values,ext.student.res,main="Externally  Studentized Residu
 
 # calc values
 
+# plot residuals vs standardized residuals found above
 n<-length(fin_data$hc_per100k)
 p<-length(best_mod$coefficients)
 
 ##critical value using Bonferroni procedure
 qt(1-0.05/(2*n), n-p-1)
 
-sort(ext.student.res)
+par(mfrow=c(1,1))
 
 plot(ext.student.res,main="Externally Studentized Residuals", ylim=c(-4,4))
 abline(h=qt(1-0.05/(2*n), n-p-1), col="red")
 abline(h=-qt(1-0.05/(2*n), n-p-1), col="red")
 
+# no outliers in the response...
+
 ext.student.res[abs(ext.student.res)>qt(1-0.05/(2*n), n-p-1)]
-
-
 
 ##leverages
 lev_full<-lm.influence(best_mod)$hat 
@@ -323,8 +333,7 @@ abline(h=2*p/n, col="red")
 
 lev_full[lev_full>2*p/n]
 
-# DC and NY very leveraged in BIC
-# DC leveraged in full
+# DC and VT leveraged in full
 
 # influential observations
 DFFITS<-dffits(best_mod)
@@ -336,8 +345,7 @@ DFBETAS[abs(DFBETAS)>2/sqrt(n)]
 COOKS<-cooks.distance(best_mod)
 COOKS[COOKS>qf(0.5,p,n-p)]
 
-
-
+# influential points by DFFITS, but not Cooks
 
 
 # check shrinkage models to see if they align with model_full and have decent predictive power
@@ -537,16 +545,6 @@ out.ols<-glmnet(x_2016,y_2016,alpha=0, lambda=0, thresh = 1e-14)
 cbind(coefficients(out.lasso), coefficients(out.ridge), coefficients(out.ols))
 
 
-
-
-
-
-
-
-
-
-
-
 summary(out.lasso)
 
 # LOOCV
@@ -569,6 +567,8 @@ for (i in 1:n) # loop through i = 1 to 28
 
 print(sum_ressqr/n) # avg MSE for the LOOCV
 
+# check with hate group, found from MSE, adjR^2, etc. analysis
+
 sum_ressqr <- 0 # start with MSE = 0
 
 for (i in 1:n) # loop through i = 1 to 28
@@ -588,23 +588,16 @@ print(sum_ressqr/n) # avg MSE for the LOOCV
 
 
 # w elasticity and hate group does slightly better by MSE
+# both produce pretty good MSEs, so both predict pretty well
 
 summary(best_mod)
+summary(hategroup_mod)
 
-# test the above solution
-
-library(boot)
-
-glm.fit<-glm(hc_per100k ~ share_voters_voted_trump + share_non_white + 
-               gini_index + con_uni_combo, data = fbi_df_2016)
-cv.err<-cv.glm(fbi_df_2016, glm.fit)
-cv.err$delta[1] ##the output for the LOOCV should match your own
-cv.glm(fbi_df_2016,glm.fit, K=50)$delta[1] ##k fold CV with k=10
 
 
 ##perform levene's test. Null states the variances are equal for all classes. 
 library(lawstat)
-levene.test(fbi_df_2016$hc_per100k,fbi_df_2016$con_uni_combo) # variances aren't equal
+levene.test(fbi_df_2016$hc_per100k,fbi_df_2016$con_uni_combo) # variances are equal
 #levene.test(hc_df$fbi_2019_per100k,hc_df$permit) # variances are equal
 #levene.test(hc_df$fbi_2019_per100k,hc_df$universl) # variances are equal
 
@@ -614,26 +607,11 @@ summary(best_mod)
 
 ##perform Tukey's multiple comparisons
 library(multcomp)
-pairwise<-glht(model_full, linfct = mcp(confederate= "Tukey"))
+pairwise<-glht(model_full, linfct = mcp(con_uni_combo= "Tukey"))
 summary(pairwise)
 
-
-##perform levene's test. Null states the variances are equal for all classes. 
-library(lawstat)
-levene.test(fbi_df_2016$hc_per100k,fbi_df_2016$universl) # variances aren't equal
-#levene.test(hc_df$fbi_2019_per100k,hc_df$permit) # variances are equal
-#levene.test(hc_df$fbi_2019_per100k,hc_df$universl) # variances are equal
-
-
-summary(model_full)
-
-##perform Tukey's multiple comparisons
-library(multcomp)
-pairwise<-glht(model_full, linfct = mcp(universl= "Tukey"))
-summary(pairwise)
 
 levels(fbi_df_2016$con_uni_combo)
-
 
 
 ###### Interaction analysis
@@ -782,6 +760,7 @@ summary(red_inter_1)
 anova(inter_1, red_inter_1)
 
 
+
 red_inter_1 <-lm(formula = hc_per100k ~ share_non_white
                  + share_voters_voted_trump*con_uni_combo +
                    + share_non_white*elasticity, data = fin_data)
@@ -804,6 +783,7 @@ summary(red_inter_1) # hierarchical principle: higher order (interaction) terms 
 
 vif(no_inter)
 
+# no multicolinearity
 
 # check if it predicts 2019 HC data well
 
@@ -829,6 +809,8 @@ for (i in 1:n) # loop through i = 1 to 28
 
 print(sum_ressqr/n) # avg MSE for the LOOCV
 
+# does pretty well
+
 
 # 2019
 
@@ -852,7 +834,7 @@ for (i in 1:n) # loop through i = 1 to 28
 
 print(sum_ressqr/n) # avg MSE for the LOOCV
 
-# not the best
+# not the best, but not terrible
 
 
 
