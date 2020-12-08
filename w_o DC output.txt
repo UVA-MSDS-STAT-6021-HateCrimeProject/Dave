@@ -1,0 +1,244 @@
+#########
+
+ model after removing variables with high VIF (indicating multicollinearity):
+
+
+#########
+
+Call:
+lm(formula = hc_per100k ~ ., data = fbi_df_2016)
+
+Residuals:
+     Min       1Q   Median       3Q      Max 
+-2.04632 -0.62820 -0.08893  0.59374  2.15666 
+
+Coefficients:
+                               Estimate Std. Error t value Pr(>|t|)  
+(Intercept)                   -4.500217   8.575405  -0.525   0.6029  
+share_unemployed_seasonal     -6.337454  23.868199  -0.266   0.7921  
+share_white_poverty           -1.222495  10.326711  -0.118   0.9064  
+gini_index                    30.238681  15.750182   1.920   0.0626 .
+share_non_white               -3.180570   2.009109  -1.583   0.1219  
+share_voters_voted_trump      -2.719857   2.680474  -1.015   0.3168  
+elasticity                    -3.568723   3.383592  -1.055   0.2984  
+permitYes                     -0.004233   0.499814  -0.008   0.9933  
+hate_group_count_2016         -0.006110   0.013098  -0.467   0.6436  
+con_uni_comboConfederate Only -1.239240   0.575871  -2.152   0.0380 *
+con_uni_comboGun Law Only     -0.667697   0.515249  -1.296   0.2030  
+pk_per100k                    -0.057936   4.847621  -0.012   0.9905  
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+Residual standard error: 1.159 on 37 degrees of freedom
+Multiple R-squared:  0.2773,	Adjusted R-squared:  0.06245 
+F-statistic: 1.291 on 11 and 37 DF,  p-value: 0.268
+
+
+#########
+
+From forward, backward, and step-wise (both) selection:
+
+#########
+
+Call:
+lm(formula = hc_per100k ~ con_uni_combo + gini_index + share_non_white, 
+    data = fbi_df_2016)
+
+Residuals:
+     Min       1Q   Median       3Q      Max 
+-2.21128 -0.74500 -0.06697  0.49787  2.32957 
+
+Coefficients:
+                              Estimate Std. Error t value Pr(>|t|)   
+(Intercept)                   -10.8563     5.1536  -2.107  0.04089 * 
+con_uni_comboConfederate Only  -1.3075     0.4524  -2.890  0.00596 **
+con_uni_comboGun Law Only      -0.4186     0.4197  -0.997  0.32407   
+gini_index                     31.5417    11.9176   2.647  0.01124 * 
+share_non_white                -2.5986     1.2919  -2.011  0.05043 . 
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+Residual standard error: 1.094 on 44 degrees of freedom
+Multiple R-squared:  0.2348,	Adjusted R-squared:  0.1653 
+F-statistic: 3.376 on 4 and 44 DF,  p-value: 0.01709
+
+#######
+
+Challenger model from best-metric selection (BIC, AIC, etc.). Produces a slightly better MSE in LOOCV than the above
+
+
+#######
+
+Call:
+lm(formula = hc_per100k ~ share_voters_voted_trump + share_non_white + 
+    gini_index + con_uni_combo + elasticity, data = fbi_df_2016)
+
+Residuals:
+     Min       1Q   Median       3Q      Max 
+-2.11405 -0.71737 -0.06582  0.70721  2.28758 
+
+Coefficients:
+                              Estimate Std. Error t value Pr(>|t|)  
+(Intercept)                    -3.3643     7.3988  -0.455   0.6517  
+share_voters_voted_trump       -2.8650     2.3080  -1.241   0.2214  
+share_non_white                -3.4799     1.4299  -2.434   0.0193 *
+gini_index                     26.8519    12.3505   2.174   0.0354 *
+con_uni_comboConfederate Only  -1.3137     0.5151  -2.551   0.0145 *
+con_uni_comboGun Law Only      -0.7064     0.4649  -1.519   0.1361  
+elasticity                     -3.5240     3.1008  -1.136   0.2622  
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+Residual standard error: 1.093 on 42 degrees of freedom
+Multiple R-squared:  0.2711,	Adjusted R-squared:  0.1669 
+F-statistic: 2.603 on 6 and 42 DF,  p-value: 0.03095
+
+
+########
+
+Levene Test. H_o is that variances are equal for all classes
+
+#######
+
+
+levene.test(fbi_df_2016$hc_per100k,fbi_df_2016$con_uni_combo) # variances are equal
+
+	Modified robust Brown-Forsythe Levene-type test based on the absolute deviations from the median
+
+data:  fbi_df_2016$hc_per100k
+Test Statistic = 0.41204, p-value = 0.6647
+
+
+#######
+
+Tukey's Multiple Comparison. H_0 is essentially that the levels don't matter (they are all the same mean). Only confederate is significantly differerent. Do we need to adjust the variable? This is suprising given when
+I ran everything with universl and confederate as separate variables
+
+#####
+
+
+	 Simultaneous Tests for General Linear Hypotheses
+
+Multiple Comparisons of Means: Tukey Contrasts
+
+
+Fit: lm(formula = hc_per100k ~ ., data = fin_data)
+
+Linear Hypotheses:
+                                     Estimate Std. Error t value Pr(>|t|)  
+Confederate Only - Neither == 0       -1.3075     0.4524  -2.890    0.016 *
+Gun Law Only - Neither == 0           -0.4186     0.4197  -0.997    0.582  
+Gun Law Only - Confederate Only == 0   0.8889     0.4468   1.990    0.127  
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+(Adjusted p values reported -- single-step method)
+
+
+
+######
+
+Final w/o DC with interaction:
+
+
+#######
+
+> summary(red_inter_1)
+
+Call:
+lm(formula = hc_per100k ~ share_non_white + gini_index + share_voters_voted_trump * 
+    con_uni_combo + +share_non_white * elasticity, data = fbi_df_2016)
+
+Residuals:
+     Min       1Q   Median       3Q      Max 
+-2.21862 -0.54897  0.02711  0.58744  1.89560 
+
+Coefficients:
+                                                       Estimate Std. Error t value Pr(>|t|)   
+(Intercept)                                              16.966      9.213   1.841  0.07317 . 
+share_non_white                                         -59.277     17.718  -3.346  0.00183 **
+gini_index                                               20.181     11.273   1.790  0.08119 . 
+share_voters_voted_trump                                 -4.969      2.327  -2.136  0.03905 * 
+con_uni_comboConfederate Only                            -4.200      3.124  -1.344  0.18659   
+con_uni_comboGun Law Only                                 3.710      2.704   1.372  0.17782   
+elasticity                                              -19.041      5.993  -3.177  0.00290 **
+share_voters_voted_trump:con_uni_comboConfederate Only    5.873      5.616   1.046  0.30211   
+share_voters_voted_trump:con_uni_comboGun Law Only      -10.376      6.114  -1.697  0.09762 . 
+share_non_white:elasticity                               53.557     16.914   3.166  0.00299 **
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+Residual standard error: 0.9736 on 39 degrees of freedom
+Multiple R-squared:  0.4624,	Adjusted R-squared:  0.3383 
+F-statistic: 3.727 on 9 and 39 DF,  p-value: 0.001881
+
+
+#######
+
+After taking sqrt to transform the response, produces this:
+
+
+#######
+
+Call:
+lm(formula = sqrt(hc_per100k) ~ share_non_white + gini_index + 
+    share_voters_voted_trump * con_uni_combo + +share_non_white * 
+    elasticity, data = fbi_df_2016)
+
+Residuals:
+     Min       1Q   Median       3Q      Max 
+-0.77825 -0.13138  0.00925  0.22960  0.64233 
+
+Coefficients:
+                                                       Estimate Std. Error t value Pr(>|t|)   
+(Intercept)                                              7.1838     3.2216   2.230  0.03158 * 
+share_non_white                                        -21.2362     6.1953  -3.428  0.00145 **
+gini_index                                               6.1908     3.9418   1.571  0.12436   
+share_voters_voted_trump                                -1.9010     0.8135  -2.337  0.02468 * 
+con_uni_comboConfederate Only                           -1.5818     1.0925  -1.448  0.15564   
+con_uni_comboGun Law Only                                1.6051     0.9454   1.698  0.09750 . 
+elasticity                                              -6.7736     2.0954  -3.233  0.00250 **
+share_voters_voted_trump:con_uni_comboConfederate Only   2.2836     1.9637   1.163  0.25193   
+share_voters_voted_trump:con_uni_comboGun Law Only      -4.3953     2.1377  -2.056  0.04651 * 
+share_non_white:elasticity                              19.2068     5.9141   3.248  0.00240 **
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+Residual standard error: 0.3405 on 39 degrees of freedom
+Multiple R-squared:  0.4812,	Adjusted R-squared:  0.3615 
+F-statistic:  4.02 on 9 and 39 DF,  p-value: 0.001063
+
+
+#######
+
+Can remove Gini per partial-F/t-test. Slightly worse adj R^2, but less complicated
+
+######
+
+
+summary(sqrt_red_exGini)
+
+Call:
+lm(formula = sqrt(hc_per100k) ~ share_non_white + share_voters_voted_trump * 
+    con_uni_combo + +share_non_white * elasticity, data = fbi_df_2016)
+
+Residuals:
+     Min       1Q   Median       3Q      Max 
+-0.72279 -0.18252  0.04949  0.20768  0.65862 
+
+Coefficients:
+                                                       Estimate Std. Error t value Pr(>|t|)    
+(Intercept)                                             10.5719     2.4363   4.339 9.44e-05 ***
+share_non_white                                        -21.8205     6.2964  -3.466  0.00128 ** 
+share_voters_voted_trump                                -2.2617     0.7946  -2.846  0.00695 ** 
+con_uni_comboConfederate Only                           -1.7879     1.1043  -1.619  0.11328    
+con_uni_comboGun Law Only                                1.6665     0.9617   1.733  0.09084 .  
+elasticity                                              -7.2581     2.1102  -3.440  0.00138 ** 
+share_voters_voted_trump:con_uni_comboConfederate Only   2.8542     1.9648   1.453  0.15412    
+share_voters_voted_trump:con_uni_comboGun Law Only      -4.4687     2.1760  -2.054  0.04659 *  
+share_non_white:elasticity                              19.9599     6.0018   3.326  0.00190 ** 
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+Residual standard error: 0.3466 on 40 degrees of freedom
+Multiple R-squared:  0.4484,	Adjusted R-squared:  0.3381 
+F-statistic: 4.065 on 8 and 40 DF,  p-value: 0.001298
