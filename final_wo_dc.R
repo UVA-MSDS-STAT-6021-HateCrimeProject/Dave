@@ -566,7 +566,7 @@ levels(fbi_df_2016$con_uni_combo)
 # consider each cut as a subset
 neither<-subset(fbi_df_2016,con_uni_combo=="Neither") 
 con<-subset(fbi_df_2016,con_uni_combo=="Confederate Only")
-law<-subset(fbi_df_2016,con_uni_combo=="Gun Law Only")
+law<-subset(fbi_df_2016,con_uni_combo=="Background Check Only")
 
 
 # fit separate regressions
