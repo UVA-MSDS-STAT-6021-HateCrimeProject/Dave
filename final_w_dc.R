@@ -3,7 +3,7 @@ library(faraway)
 library(leaps)
 library(tidyverse)
 
-hc_df<-read.csv('hate_crimes_full_v2.csv', row.names = 'state_abbrev') # read in data from the cleansing file
+hc_df<-read.csv('hate_crimes_full_vfin.csv', row.names = 'state_abbrev') # read in data from the cleansing file
 
 
 # We don't really want to use the SPLC data since those data were collected for some period directly after the 2016 election. SPLC also collects HC data in a very specific
@@ -29,30 +29,43 @@ fbi_df_2019<-hc_df[ , !(names(hc_df) %in% c('average_hatecrimes_per_100k_fbi', '
 
 colnames(fbi_df_2016)
 
+# make 'Neither' the reference
+
 levels(fbi_df_2016$con_uni_combo)
 fbi_df_2016$con_uni_combo<-relevel(fbi_df_2016$con_uni_combo, ref = "Neither")
 levels(fbi_df_2016$con_uni_combo)
-
-fbi_df_2019$con_uni_combo<-relevel(fbi_df_2019$con_uni_combo, ref = "Neither")
-levels(fbi_df_2019$con_uni_combo)
-
 
 # rename hate crime columns to standardize
 fbi_df_2016<-rename(fbi_df_2016, hc_per100k=avg_hatecrimes_per_100k_fbi)
 
 fbi_df_2019<-rename(fbi_df_2019, hc_per100k=fbi_2019_per100k)
 
-# drop NAs from HC values
+# drop NAs from HC values (only Hawaii)
 fbi_df_2016<-fbi_df_2016 %>% drop_na(hc_per100k)
+
+levels(fbi_df_2016$con_uni_combo)
+fbi_df_2016$con_uni_combo<-relevel(fbi_df_2016$con_uni_combo, ref = "Neither")
+levels(fbi_df_2016$con_uni_combo)
+
+levels(fbi_df_2019$con_uni_combo)
+fbi_df_2019$con_uni_combo<-relevel(fbi_df_2019$con_uni_combo, ref = "Neither")
+levels(fbi_df_2019$con_uni_combo)
+
 
 # create box plots of categorical data. Notice difference in shape of confederate data -- confederate states had fewer HCs 
 # remaining two variables do not show the same difference
 
 par(mfrow=c(1,2))
-boxplot(fbi_df_2016$hc_per100k~fbi_df_2016$con_uni_combo, main = '2016 FBI')
+boxplot(fbi_df_2016$hc_per100k~fbi_df_2016$con_uni_combo, main = '2016 FBI: HC Rate by Levels w DC', xlab = 'Confederate-Background Check Combo',
+        ylab = 'Hate Crimes per 100k (2016)', ylim=c(0,32))
+grid()
 
-boxplot(fbi_df_2019$hc_per100k~fbi_df_2019$con_uni_combo, main = '2019 FBI')
+boxplot(fbi_df_2019$hc_per100k~fbi_df_2019$con_uni_combo, main = '2019 FBI: HC Rate by Levels w DC',  xlab = 'Confederate-Background Check Combo',
+        ylab ='Hate Crimes per 100k (2019)', ylim=c(0,32))
 
+grid()
+
+# DC is a huge outlier on the avg hatecrimes
 
 # not much to see in the scatter matrix. DC sticks out a lot as far as hate crimes, and we notice some heavy correlation between variables. Will want to 
 # explore DC during outlier analysis
@@ -114,18 +127,26 @@ summary(for_model)
 summary(back_model)
 summary(both_model)
 
+step_wise<-both_model
+
+summary(step_wise)
+
 # all produce the same models Relatively high adj R^2 and significant t-vals
 
-par(mfrow=c(1,3))
 
-plot(both_model$fitted.values,both_model$residuals, main="Plot of Residuals against Fitted Values")
+par(mfrow=c(2,2))
+
+plot(step_wise$fitted.values,step_wise$residuals, main="Plot of Residuals against Fitted Values")
 abline(h=0,col="red")
 
 library(MASS)
-boxcox(both_model, lambda = seq(-2, 3, 1/10), main="Box Cox, Model 1")
+boxcox(step_wise, lambda = seq(-1.25, 3, 1/10),  main="Box-Cox Lambda Transform")
 
 ##acf plot of residuals
-acf(both_model$residuals)
+acf(step_wise$residuals,  main="ACF Lag Plot")
+
+qqnorm(step_wise$residuals)
+qqline(step_wise$residuals, col="red")
 
 
 # too good to be true -- need to transform the data. Try a sqrt transform?
@@ -136,14 +157,20 @@ sqrt_model <- lm(formula = sqrt(hc_per100k) ~ share_voters_voted_trump + gini_in
 
 summary(sqrt_model)
 
-plot(sqrt_model$fitted.values,sqrt_model$residuals, main="Plot of Residuals against Fitted Values, post Transform")
+
+par(mfrow=c(2,2))
+
+plot(sqrt_model$fitted.values,sqrt_model$residuals, main="Plot of Residuals against Fitted Values")
 abline(h=0,col="red")
 
 library(MASS)
-boxcox(sqrt_model, lambda = seq(-2, 4, 1/10), main="Box Cox, sqrt Y")
+boxcox(sqrt_model, lambda = seq(-1.25, 3, 1/10),  main="Box-Cox Lambda Transform")
 
 ##acf plot of residuals
-acf(sqrt_model$residuals)
+acf(sqrt_model$residuals,  main="ACF Lag Plot")
+
+qqnorm(sqrt_model$residuals)
+qqline(sqrt_model$residuals, col="red")
 
 # not too bad, but we might want to rerun the model selection with the newly-transformed data
 
@@ -194,17 +221,6 @@ full_sqrt<-lm(hc_per100k~., data = fbi_df_2016)
 vif(full_sqrt)
 
 # no multicollinearity, which makes sense since the transformation shouldn't have changed that
-
-par(mfrow=c(1,3))
-
-plot(back_model$fitted.values,back_model$residuals, main="Plot of Residuals against Fitted Values")
-abline(h=0,col="red")
-
-library(MASS)
-boxcox(back_model, lambda = seq(-1, 4, 1/10))
-
-##acf plot of residuals
-acf(back_model$residuals)
 
 
 fin_vars<-c('hc_per100k', 'gini_index', 'share_non_white',
@@ -297,12 +313,6 @@ student.res<-rstandard(best_mod)
 ext.student.res<-rstudent(best_mod) 
 
 sort(ext.student.res)
-par(mfrow=c(1,3))
-plot(best_mod$fitted.values,res_full,main="Residuals")
-plot(best_mod$fitted.values,student.res,main="Studentized Residuals")
-plot(best_mod$fitted.values,ext.student.res,main="Externally  Studentized Residuals")
-
-# calc values
 
 # plot residuals vs standardized residuals found above
 n<-length(fin_data$hc_per100k)
@@ -311,7 +321,16 @@ p<-length(best_mod$coefficients)
 ##critical value using Bonferroni procedure
 qt(1-0.05/(2*n), n-p-1)
 
-par(mfrow=c(1,1))
+par(mfrow=c(1,3))
+plot(best_mod$fitted.values,res_full,main="Residuals")
+plot(best_mod$fitted.values,student.res,main="Studentized Residuals")
+#plot(best_mod$fitted.values,ext.student.res,main="Externally  Studentized Residuals")
+
+# calc values
+
+
+
+
 
 plot(ext.student.res,main="Externally Studentized Residuals", ylim=c(-4,4))
 abline(h=qt(1-0.05/(2*n), n-p-1), col="red")
@@ -326,10 +345,12 @@ lev_full<-lm.influence(best_mod)$hat
 
 sort(lev_full)
 
+par(mfrow=c(1,1))
 plot(lev_full, main="Leverages", ylim=c(0,0.6))
 abline(h=2*p/n, col="red")
 
 # get leverage points
+
 
 lev_full[lev_full>2*p/n]
 
@@ -396,6 +417,8 @@ lasso.mod.1<-glmnet(x_2016[train,],y_2016[train],alpha=1,lambda=1, thresh = 1e-1
 lasso.pred.1<-predict(lasso.mod.1,newx=x_2016[test,])
 mean((lasso.pred.1-y.test)^2)
 
+# MSE = 0.3581547
+
 # perform ridge
 
 ##alpha=0 for ridge, alpha=1 for LASSO
@@ -445,8 +468,48 @@ out.ridge<-glmnet(x_2016,y_2016,alpha=0,lambda=bestlam.r,thresh = 1e-14)
 out.ols<-glmnet(x_2016,y_2016,alpha=0, lambda=0, thresh = 1e-14)
 cbind(coefficients(out.lasso), coefficients(out.ridge), coefficients(out.ols))
 
+residuals.glm(out.lasso, type = 'response')
+
+# LOOCV w Lasso
 
 
+sum_ressqr <- 0 # start with MSE = 0
+
+#testrow <- fbi_df_2016[c(i), ] # test DF is just the ith row
+testrow<-data.matrix(fbi_df_2016[c(1), ])
+testrow
+train_data <- fbi_df_2016[-c(1),] # training data is a DF with every row except the ith
+
+preds<-predict(out.lasso,newx = testrow, type="response") # predict the response for the ith row
+
+preds[1]
+
+cv.glm(x_2016, out.lasso, function(r, pi = 0) mean(abs(r-pi) > 0.5), 50)
+
+#### forget about this loop; doesn't really work
+
+for (i in 1:n) # loop through i = 1 to 28
+{
+  
+  testrow1 <- fbi_df_2016[c(i), ] # test DF is just the ith row
+  testrow<-data.matrix(fbi_df_2016[c(i), ])
+  
+  train_data <- fbi_df_2016[-c(i),] # training data is a DF with every row except the ith
+  
+  preds<-predict(out.lasso,newx = testrow, type="response") # predict the response for the ith row
+  
+  sum_ressqr <- sum_ressqr + (preds[1] - testrow1$hc_per100k)^2 # add the res^2 to the cumulative sum 
+  print(preds - testrow1$hc_per100k)
+  
+}
+
+print(sum_ressqr/n) # avg MSE for the LOOCV
+
+########
+
+
+
+## below probably doesn't matter
 
 # check with smaller dataset #
 
@@ -592,6 +655,7 @@ print(sum_ressqr/n) # avg MSE for the LOOCV
 
 summary(best_mod)
 summary(hategroup_mod)
+summary(red)
 
 
 
@@ -619,7 +683,7 @@ levels(fbi_df_2016$con_uni_combo)
 # consider each cut as a subset
 neither<-subset(fbi_df_2016,con_uni_combo=="Neither") 
 con<-subset(fbi_df_2016,con_uni_combo=="Confederate Only")
-law<-subset(fbi_df_2016,con_uni_combo=="Gun Law Only")
+law<-subset(fbi_df_2016,con_uni_combo=="Background Check Only")
 
 
 # fit separate regressions
@@ -630,7 +694,7 @@ gini_law <- lm(hc_per100k~gini_index,data=law)
 
 # Create scatters:
 
-plot(fbi_df_2016$gini_index, fbi_df_2016$hc_per100k, main="Con and Gun Law")
+plot(fbi_df_2016$gini_index, fbi_df_2016$hc_per100k, main="Hate-Crime Rate and Gini Index", xlab = 'Gini', ylab = 'Hate Crimes per 100k')
 points(neither$gini_index, neither$hc_per100k, pch=2, col="blue")
 points(con$gini_index, con$hc_per100k, pch=3, col="red")
 points(law$gini_index, law$hc_per100k, pch=4, col="orange")
@@ -639,6 +703,7 @@ points(law$gini_index, law$hc_per100k, pch=4, col="orange")
 abline(gini_neither,lty=1, col="blue")
 abline(gini_con,lty=2, col="red") 
 abline(gini_law,lty=3, col="orange")
+legend("bottomright", c("Neither","Confederate Only","Background-Check Only"), lty=c(1,2,3), pch=c(2,3,4), col=c("blue","red","orange"))
 
 
 summary(red)
@@ -655,7 +720,7 @@ trump_law <- lm(hc_per100k~share_voters_voted_trump,data=law)
 
 # Create scatters:
 
-plot(fbi_df_2016$share_voters_voted_trump, fbi_df_2016$hc_per100k, main="Con and Gun Law")
+plot(fbi_df_2016$share_voters_voted_trump, fbi_df_2016$hc_per100k, main="Hate-Crime Rate and Share Voters for Trump (2016)", xlab = 'Share Voted for Trump (2016)', ylab = 'Hate Crimes per 100k')
 points(neither$share_voters_voted_trump, neither$hc_per100k, pch=2, col="blue")
 points(con$share_voters_voted_trump, con$hc_per100k, pch=3, col="red")
 points(law$share_voters_voted_trump, law$hc_per100k, pch=4, col="orange")
@@ -664,6 +729,7 @@ points(law$share_voters_voted_trump, law$hc_per100k, pch=4, col="orange")
 abline(trump_neither,lty=1, col="blue")
 abline(trump_con,lty=2, col="red") 
 abline(trump_law,lty=3, col="orange")
+legend("bottomright", c("Neither","Confederate Only","Background-Check Only"), lty=c(1,2,3), pch=c(2,3,4), col=c("blue","red","orange"))
 
 
 
@@ -678,7 +744,7 @@ nw_law <- lm(hc_per100k~share_non_white,data=law)
 
 # Create scatters:
 
-plot(fbi_df_2016$share_non_white, fbi_df_2016$hc_per100k, main="Con and Gun Law")
+plot(fbi_df_2016$share_non_white, fbi_df_2016$hc_per100k, main="Hate-Crime Rate and % Non White", xlab = '% Non White', ylab = 'Hate Crimes per 100k')
 points(neither$share_non_white, neither$hc_per100k, pch=2, col="blue")
 points(con$share_non_white, con$hc_per100k, pch=3, col="red")
 points(law$share_non_white, law$hc_per100k, pch=4, col="orange")
@@ -687,6 +753,7 @@ points(law$share_non_white, law$hc_per100k, pch=4, col="orange")
 abline(nw_neither,lty=1, col="blue")
 abline(nw_con,lty=2, col="red") 
 abline(nw_law,lty=3, col="orange")
+legend("bottomright", c("Neither","Confederate Only","Background-Check Only"), lty=c(1,2,3), pch=c(2,3,4), col=c("blue","red","orange"))
 
 
 
@@ -700,7 +767,7 @@ el_law <- lm(hc_per100k~elasticity,data=law)
 
 # Create scatters:
 
-plot(fbi_df_2016$elasticity, fbi_df_2016$hc_per100k, main="Con and Gun Law")
+plot(fbi_df_2016$elasticity, fbi_df_2016$hc_per100k, main="Hate-Crime Rate and Political Elasticity", xlab = 'Elasticity Score', ylab = 'Hate Crimes per 100k')
 points(neither$elasticity, neither$hc_per100k, pch=2, col="blue")
 points(con$elasticity, con$hc_per100k, pch=3, col="red")
 points(law$elasticity, law$hc_per100k, pch=4, col="orange")
@@ -709,9 +776,9 @@ points(law$elasticity, law$hc_per100k, pch=4, col="orange")
 abline(el_neither,lty=1, col="blue")
 abline(el_con,lty=2, col="red") 
 abline(el_law,lty=3, col="orange")
+legend("bottomright", c("Neither","Confederate Only","Background-Check Only"), lty=c(1,2,3), pch=c(2,3,4), col=c("blue","red","orange"))
 
-
-######################
+#################
 
 
 
@@ -771,7 +838,7 @@ no_inter<-lm(formula = hc_per100k ~ share_non_white
 
 summary(no_inter)
 summary(red_inter_1)
-anova(inter_1, red_inter_1)
+anova(no_inter, red_inter_1)
 
 best_mod<-red_inter_1
 
@@ -782,6 +849,7 @@ summary(red_inter_1) # hierarchical principle: higher order (interaction) terms 
 
 
 vif(no_inter)
+
 
 # no multicolinearity
 
@@ -836,17 +904,18 @@ print(sum_ressqr/n) # avg MSE for the LOOCV
 
 # not the best, but not terrible
 
+summary(red_inter_1)
 
+par(mfrow=c(2,2))
 
-plot(best_mod$fitted.values,best_mod$residuals, main="Plot of Residuals against Fitted Values")
+plot(red_inter_1$fitted.values,red_inter_1$residuals, main="Plot of Residuals against Fitted Values")
 abline(h=0,col="red")
 
 library(MASS)
-boxcox(best_mod, lambda = seq(-1, 4, 1/10))
+boxcox(red_inter_1, lambda = seq(-1.25, 3, 1/10),  main="Box-Cox Lambda Transform")
 
 ##acf plot of residuals
-acf(best_mod$residuals)
+acf(red_inter_1$residuals,  main="ACF Lag Plot")
 
-summary(best_mod)
-
-
+qqnorm(red_inter_1$residuals)
+qqline(red_inter_1$residuals, col="red")
